@@ -1,0 +1,15 @@
+plugin:
+  use: false
+  driver: com.mysql.jdbc.Driver
+  database: jdbc:mysql://127.0.0.1:3306/database
+  username: user
+  password: word
+  check: 3000
+
+sync:
+  health: true
+  food: true
+  exp: true
+  inventory: true
+  enderChest: true
+  potion: true
