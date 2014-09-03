@@ -1,0 +1,8 @@
+config:
+  broadcast: true
+  delay: 60
+
+broad:
+- 玩家 _PLAYER 被一道天雷劈成了一堆渣渣!
+- 玩家 _PLAYER 所为天怒人怨被一道神雷带走了!
+- 服务器降下了一道天雷劈死了 _PLAYER 这个熊!

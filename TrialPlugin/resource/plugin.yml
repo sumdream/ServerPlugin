@@ -1,0 +1,12 @@
+main: com.mengcraft.server.TrialPlugin
+name: TrialPlugin
+version: 0.1.0
+
+commands:
+  trial:
+    description: "Trial player with thunder light"
+    permission: trial.admin
+
+permissions:
+  trial.admin:
+    default: op
