@@ -1,0 +1,6 @@
+delay:
+  world: 1200
+  player: 6000
+
+config:
+  saveOnDisable: true
