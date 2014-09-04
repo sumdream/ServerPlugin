@@ -37,7 +37,7 @@ public class OnlinePlayer {
 
     public void startSchedule() {
         if (taskId < 0) {
-            taskId = new PlayerSchedule().runTaskTimerAsynchronously(
+            taskId = new SchedulePlayer().runTaskTimer(
                     PlayerSQL.getInstance(),
                     6000,
                     6000
@@ -52,11 +52,15 @@ public class OnlinePlayer {
     }
 
     public void loadPlayer() {
-        new LoadPlayer().runTaskLaterAsynchronously(PlayerSQL.getInstance(), 5);
+        Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
+        String playerName = getPlayerName(player);
+        new GetPlayer(playerName).runTaskAsynchronously(PlayerSQL.getInstance());
+        new LoadPlayer(player, playerName).runTaskTimer(PlayerSQL.getInstance(), 1, 1);
     }
 
     public void savePlayer() {
-        new SavePlayer().runTaskAsynchronously(PlayerSQL.getInstance());
+        Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
+        new SavePlayer(getPlayerName(player), getPlayerData(player)).runTaskAsynchronously(PlayerSQL.getInstance());
     }
 
     public String getPlayerName(Player player) {
@@ -116,7 +120,7 @@ public class OnlinePlayer {
         return potions;
     }
 
-    private class PlayerSchedule extends BukkitRunnable {
+    private class SchedulePlayer extends BukkitRunnable {
         @Override
         public void run() {
             savePlayer();
@@ -124,16 +128,22 @@ public class OnlinePlayer {
     }
 
     private class SavePlayer extends BukkitRunnable {
+
+        private final String playerName;
+        private final String playerData;
+
+        public SavePlayer(String playerName, String playerData) {
+            this.playerName = playerName;
+            this.playerData = playerData;
+        }
+
         @Override
         public void run() {
-            Player player = PlayerSQL.getInstance().getServer().getPlayer(name);
-            String playerName = getPlayerName(player);
             try {
                 String sql = "UPDATE PlayerSQL " +
                         "SET DATA = ? " +
                         "WHERE NAME = ?;";
                 PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
-                String playerData = getPlayerData(player);
                 statement.setString(1, playerData);
                 statement.setString(2, playerName);
                 statement.executeUpdate();
@@ -144,32 +154,28 @@ public class OnlinePlayer {
         }
     }
 
-    private class LoadPlayer extends BukkitRunnable {
+    private class GetPlayer extends BukkitRunnable {
+        private final String playerName;
+
+        public GetPlayer(String playerName) {
+            this.playerName = playerName;
+        }
+
         @Override
         public void run() {
-            Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
-            String playerName = getPlayerName(player);
             try {
                 String sql = "SELECT DATA FROM PlayerSQL " +
                         "WHERE NAME = ? FOR UPDATE;";
                 PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
                 statement.setString(1, playerName);
                 ResultSet result = statement.executeQuery();
-                Boolean next = result.next();
+                boolean next = result.next();
                 if (next) {
                     String data = result.getString(1);
-                    if (data != null) {
-                        JSONArray array = (JSONArray) JSONValue.parse(data);
-                        loadPlayerInventory(player, array);
-                        loadPlayerHealth(player, array);
-                        loadPlayerLevel(player, array);
-                        loadPlayerFood(player, array);
-                        loadPlayerPotion(player, array);
-                        loadPlayerChest(player, array);
-                    }
+                    PlayerSQL.getInstance().getConfig().set("player." + playerName, data);
                 } else {
-                    sql = "INSERT INTO PlayerSQL(NAME) " +
-                            "VALUES(?);";
+                    PlayerSQL.getInstance().getConfig().set("player." + playerName, "NewPlayer");
+                    sql = "INSERT INTO PlayerSQL(NAME) VALUES(?);";
                     PreparedStatement statement_ = PlayerSQL.getConnection().prepareStatement(sql);
                     statement_.setString(1, playerName);
                     statement_.executeUpdate();
@@ -179,6 +185,35 @@ public class OnlinePlayer {
                 result.close();
             } catch (SQLException e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    private class LoadPlayer extends BukkitRunnable {
+
+        private final Player player;
+        private final String playerName;
+
+        public LoadPlayer(Player player, String playerName) {
+            this.player = player;
+            this.playerName = playerName;
+        }
+
+        @Override
+        public void run() {
+            String data = PlayerSQL.getInstance().getConfig().getString("player." + playerName);
+            if (data != null) {
+                if (!data.equals("NewPlayer")) {
+                    JSONArray array = (JSONArray) JSONValue.parse(data);
+                    loadPlayerInventory(player, array);
+                    loadPlayerHealth(player, array);
+                    loadPlayerLevel(player, array);
+                    loadPlayerFood(player, array);
+                    loadPlayerPotion(player, array);
+                    loadPlayerChest(player, array);
+                }
+                PlayerSQL.getInstance().getConfig().set("player." + playerName, null);
+                cancel();
             }
         }
 

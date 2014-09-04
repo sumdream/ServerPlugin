@@ -29,20 +29,20 @@ public class PlayerSQL extends JavaPlugin {
 
     @Override
     public void onLoad() {
+        saveDefaultConfig();
         plugin = this;
     }
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
         boolean use = getConfig().getBoolean("plugin.use", false);
         if (use) {
             try {
                 setConnection();
                 setDataTable();
                 new CheckTask().runTaskTimer(this,
-                        getConfig().getInt("plugin.check", 3000),
                         getConfig().getInt("plugin.check", 3000)
+                        , getConfig().getInt("plugin.check", 3000)
                 );
                 getServer().getPluginManager().registerEvents(new PlayerListener(), this);
 
@@ -73,7 +73,7 @@ public class PlayerSQL extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        com.mengcraft.server.PlayerManager.saveAll();
+        PlayerManager.saveAll();
         getLogger().info("Author: min梦梦");
         getLogger().info("插件作者: min梦梦");
     }
@@ -108,7 +108,7 @@ public class PlayerSQL extends JavaPlugin {
         @EventHandler(priority = EventPriority.MONITOR)
         public void playerQuit(PlayerQuitEvent event) {
             String name = event.getPlayer().getName();
-            com.mengcraft.server.OnlinePlayer onlinePlayer = com.mengcraft.server.PlayerManager.getOnlinePlayer(name);
+            OnlinePlayer onlinePlayer = PlayerManager.getOnlinePlayer(name);
             onlinePlayer.savePlayer();
             onlinePlayer.stopSchedule();
             String message = "Player " + name + " offline";
