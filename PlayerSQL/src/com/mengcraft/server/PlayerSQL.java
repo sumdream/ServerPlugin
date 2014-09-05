@@ -57,17 +57,16 @@ public class PlayerSQL extends JavaPlugin {
                 getLogger().warning("Failed to connect to database");
                 getLogger().warning("Please modify config.yml!!!!!");
                 getServer().getPluginManager().disablePlugin(this);
+                e.printStackTrace();
             }
             try {
-                Metrics metrics = new Metrics(this);
-                metrics.start();
+                new Metrics(this).start();
             } catch (Exception e) {
-                getLogger().warning("Failed to connect to mcstats.org");
                 getLogger().warning("Failed to connect to mcstats.org");
             }
         } else {
             getLogger().warning("Please modify config.yml!!!");
-            setEnabled(false);
+            getServer().getPluginManager().disablePlugin(this);
         }
     }
 
@@ -79,12 +78,10 @@ public class PlayerSQL extends JavaPlugin {
     }
 
     private void setConnection() {
-        String driver = getConfig().getString("plugin.driver");
         String database = getConfig().getString("plugin.database");
         String username = getConfig().getString("plugin.username");
         String password = getConfig().getString("plugin.password");
         try {
-            Class.forName(driver);
             PlayerSQL.connection = DriverManager.getConnection(database, username, password);
         } catch (Exception e) {
             e.printStackTrace();
@@ -92,15 +89,22 @@ public class PlayerSQL extends JavaPlugin {
     }
 
     private void setDataTable() throws SQLException {
-        String sql = "CREATE TABLE IF NOT EXISTS PlayerSQL(" +
-                "ID int NOT NULL AUTO_INCREMENT, " +
-                "NAME text NULL, " +
-                "DATA text NULL, " +
-                "PRIMARY KEY(ID)" +
-                ");";
-        Statement statement = connection.createStatement();
-        statement.executeUpdate(sql);
-        statement.close();
+        Statement create = connection.createStatement();
+        create.execute("CREATE TABLE IF NOT EXISTS PlayerSQL("
+                        + "ID int NOT NULL AUTO_INCREMENT, "
+                        + "NAME text NOT NULL, "
+                        + "DATA text NULL, "
+                        + "ONLINE int NULL, "
+                        + "PRIMARY KEY(ID));"
+        );
+        try {
+            create.execute("ALTER TABLE `PlayerSQL`"
+                            + "ADD COLUMN `ONLINE` int NULL AFTER `DATA`;"
+            );
+        } catch (Exception e) {
+            e.getMessage();
+        }
+        create.close();
     }
 
     private class PlayerListener implements Listener {
@@ -108,21 +112,13 @@ public class PlayerSQL extends JavaPlugin {
         @EventHandler(priority = EventPriority.MONITOR)
         public void playerQuit(PlayerQuitEvent event) {
             String name = event.getPlayer().getName();
-            OnlinePlayer onlinePlayer = PlayerManager.getOnlinePlayer(name);
-            onlinePlayer.savePlayer();
-            onlinePlayer.stopSchedule();
-            String message = "Player " + name + " offline";
-            getLogger().info(message);
+            PlayerManager.getOnlinePlayer(name).savePlayer(true);
         }
 
         @EventHandler(priority = EventPriority.HIGHEST)
         public void playerJoin(PlayerJoinEvent event) {
             String name = event.getPlayer().getName();
-            OnlinePlayer onlinePlayer = PlayerManager.getOnlinePlayer(name);
-            onlinePlayer.loadPlayer();
-            onlinePlayer.startSchedule();
-            String message = "Player " + name + " online";
-            getLogger().info(message);
+            PlayerManager.getOnlinePlayer(name).loadPlayer();
         }
     }
 

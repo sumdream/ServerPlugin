@@ -14,7 +14,7 @@ public class PlayerManager {
         if (players.length > 0) {
             try {
                 String sql = "UPDATE PlayerSQL " +
-                        "SET DATA = ? " +
+                        "SET DATA = ?, ONLINE = 0 " +
                         "WHERE NAME = ?;";
                 PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
                 for (Player player : players) {

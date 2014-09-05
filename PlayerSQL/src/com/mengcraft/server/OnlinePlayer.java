@@ -29,46 +29,40 @@ import java.util.Map;
 public class OnlinePlayer {
 
     private final String name;
-    private int taskId = -1;
+    private int task;
 
     public OnlinePlayer(String name) {
         this.name = name;
-    }
-
-    public void startSchedule() {
-        if (taskId < 0) {
-            taskId = new SchedulePlayer().runTaskTimer(
-                    PlayerSQL.getInstance(),
-                    6000,
-                    6000
-            ).getTaskId();
-        }
-    }
-
-    public void stopSchedule() {
-        if (taskId > 0) {
-            PlayerSQL.getInstance().getServer().getScheduler().cancelTask(taskId);
-        }
+        this.task = -1;
     }
 
     public void loadPlayer() {
         Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
+//        System.out.println(player.getWorld().getTime());
         String playerName = getPlayerName(player);
-        new GetPlayer(playerName).runTaskAsynchronously(PlayerSQL.getInstance());
-        new LoadPlayer(player, playerName).runTaskTimer(PlayerSQL.getInstance(), 1, 1);
+        new GetPlayer(playerName).runTaskLaterAsynchronously(PlayerSQL.getInstance(), 1);
+        new LoadPlayer(player, playerName).runTaskLater(PlayerSQL.getInstance(), 2);
+        if (task < 0) {
+            task = new SaveTimer().runTaskTimer(PlayerSQL.getInstance(), 3600, 3600).getTaskId();
+        }
     }
 
-    public void savePlayer() {
+    public void savePlayer(boolean isLogout) {
         Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
-        new SavePlayer(getPlayerName(player), getPlayerData(player)).runTaskAsynchronously(PlayerSQL.getInstance());
+        if (isLogout) {
+            PlayerSQL.getInstance().getServer().getScheduler().cancelTask(task);
+        }
+        new SavePlayer(
+                getPlayerName(player)
+                , getPlayerData(player)
+                , isLogout
+        ).runTaskAsynchronously(PlayerSQL.getInstance());
     }
 
     public String getPlayerName(Player player) {
-        boolean useUUID = PlayerSQL.getInstance().getConfig().getBoolean("useUUID", false);
-        if (useUUID) {
-            return player.getUniqueId().toString();
-        }
-        return player.getName();
+        return PlayerSQL.getInstance().getConfig().getBoolean("useUUID", false)
+                ? player.getUniqueId().toString()
+                : player.getName();
     }
 
     public String getPlayerData(Player player) {
@@ -120,10 +114,10 @@ public class OnlinePlayer {
         return potions;
     }
 
-    private class SchedulePlayer extends BukkitRunnable {
+    private class SaveTimer extends BukkitRunnable {
         @Override
         public void run() {
-            savePlayer();
+            savePlayer(false);
         }
     }
 
@@ -131,23 +125,36 @@ public class OnlinePlayer {
 
         private final String playerName;
         private final String playerData;
+        private final boolean isLogout;
 
-        public SavePlayer(String playerName, String playerData) {
+        public SavePlayer(String playerName, String playerData, boolean isLogout) {
             this.playerName = playerName;
             this.playerData = playerData;
+            this.isLogout = isLogout;
         }
 
         @Override
         public void run() {
             try {
-                String sql = "UPDATE PlayerSQL " +
-                        "SET DATA = ? " +
-                        "WHERE NAME = ?;";
-                PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
-                statement.setString(1, playerData);
-                statement.setString(2, playerName);
-                statement.executeUpdate();
-                statement.close();
+                if (isLogout) {
+                    PreparedStatement save = PlayerSQL.getConnection().prepareStatement("UPDATE PlayerSQL "
+                                    + "SET DATA = ?, ONLINE = 0 "
+                                    + "WHERE NAME = ?;"
+                    );
+                    save.setString(1, playerData);
+                    save.setString(2, playerName);
+                    save.executeUpdate();
+                    save.close();
+                } else {
+                    PreparedStatement save = PlayerSQL.getConnection().prepareStatement("UPDATE PlayerSQL "
+                                    + "SET DATA = ?, ONLINE = 1 "
+                                    + "WHERE NAME = ?;"
+                    );
+                    save.setString(1, playerData);
+                    save.setString(2, playerName);
+                    save.executeUpdate();
+                    save.close();
+                }
             } catch (SQLException e) {
                 e.printStackTrace();
             }
@@ -163,29 +170,70 @@ public class OnlinePlayer {
 
         @Override
         public void run() {
+//            System.out.println("Get...");
             try {
-                String sql = "SELECT DATA FROM PlayerSQL " +
-                        "WHERE NAME = ? FOR UPDATE;";
-                PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
-                statement.setString(1, playerName);
-                ResultSet result = statement.executeQuery();
-                boolean next = result.next();
-                if (next) {
-                    String data = result.getString(1);
-                    PlayerSQL.getInstance().getConfig().set("player." + playerName, data);
+                PreparedStatement onlineSelect = PlayerSQL.getConnection().prepareStatement("SELECT ONLINE " +
+                                "FROM PlayerSQL WHERE NAME = ? FOR UPDATE;"
+                );
+                onlineSelect.setString(1, playerName);
+                ResultSet onlineResult = onlineSelect.executeQuery();
+                if (onlineResult.next()) {
+                    if (onlineResult.getInt(1) < 1) {
+                        getPlayer();
+                        clearRetryPoint();
+                    } else {
+                        if (getRetryPoint() < 20) {
+                            addRetryPoint();
+                            new GetPlayer(playerName).runTaskLaterAsynchronously(PlayerSQL.getInstance(), 1);
+                        } else {
+                            getPlayer();
+                            clearRetryPoint();
+                        }
+                    }
                 } else {
                     PlayerSQL.getInstance().getConfig().set("player." + playerName, "NewPlayer");
-                    sql = "INSERT INTO PlayerSQL(NAME) VALUES(?);";
-                    PreparedStatement statement_ = PlayerSQL.getConnection().prepareStatement(sql);
-                    statement_.setString(1, playerName);
-                    statement_.executeUpdate();
-                    statement_.close();
+                    PreparedStatement insert = PlayerSQL.getConnection().prepareStatement("INSERT INTO PlayerSQL(NAME) VALUES(?);");
+                    insert.setString(1, playerName);
+                    insert.executeUpdate();
+                    insert.close();
                 }
-                statement.close();
-                result.close();
-            } catch (SQLException e) {
+                onlineSelect.close();
+                onlineResult.close();
+            } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+
+        private void clearRetryPoint() {
+            PlayerSQL.getInstance().getConfig().set("retry." + playerName, null);
+        }
+
+        private int getRetryPoint() {
+            return PlayerSQL.getInstance().getConfig().getInt("retry." + playerName, 0);
+        }
+
+        private void addRetryPoint() {
+            int point = PlayerSQL.getInstance().getConfig().getInt("retry." + playerName, 1);
+            PlayerSQL.getInstance().getConfig().set("retry." + playerName, point + 1);
+        }
+
+        private void getPlayer() throws SQLException {
+            PreparedStatement dataSelect = PlayerSQL.getConnection().prepareStatement("SELECT DATA " +
+                            "FROM PlayerSQL WHERE NAME = ? FOR UPDATE;"
+            );
+            dataSelect.setString(1, playerName);
+            ResultSet dataResult = dataSelect.executeQuery();
+            if (dataResult.next()) {
+                PlayerSQL.getInstance().getConfig().set("player." + playerName, dataResult.getString(1));
+            }
+            PreparedStatement updateOnline = PlayerSQL.getConnection().prepareStatement("UPDATE PlayerSQL "
+                    + "SET ONLINE = 1 "
+                    + "WHERE NAME = ?;");
+            updateOnline.setString(1, playerName);
+            updateOnline.executeUpdate();
+            updateOnline.close();
+            dataSelect.close();
+            dataResult.close();
         }
     }
 
@@ -213,7 +261,10 @@ public class OnlinePlayer {
                     loadPlayerChest(player, array);
                 }
                 PlayerSQL.getInstance().getConfig().set("player." + playerName, null);
-                cancel();
+//                System.out.println(player.getWorld().getTime());
+            } else {
+//                System.out.println("Load...");
+                new LoadPlayer(player, playerName).runTaskLater(PlayerSQL.getInstance(), 1);
             }
         }
 

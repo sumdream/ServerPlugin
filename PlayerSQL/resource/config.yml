@@ -1,6 +1,5 @@
 plugin:
   use: false
-  driver: com.mysql.jdbc.Driver
   database: jdbc:mysql://127.0.0.1:3306/database
   username: user
   password: word
