@@ -1,8 +1,10 @@
 package com.mengcraft.server;
 
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,6 +15,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 
 public class PlayerSQL extends JavaPlugin {
 
@@ -108,17 +111,42 @@ public class PlayerSQL extends JavaPlugin {
     }
 
     private class PlayerListener implements Listener {
+        private final ArrayList<Object> noDropSet;
+
+        private PlayerListener() {
+            noDropSet = new ArrayList<>();
+        }
 
         @EventHandler(priority = EventPriority.MONITOR)
         public void playerQuit(PlayerQuitEvent event) {
-            String name = event.getPlayer().getName();
-            PlayerManager.getOnlinePlayer(name).savePlayer(true);
+            PlayerManager.getOnlinePlayer(event.getPlayer()).savePlayer(true);
         }
 
-        @EventHandler(priority = EventPriority.HIGHEST)
+        @EventHandler(priority = EventPriority.LOWEST)
         public void playerJoin(PlayerJoinEvent event) {
-            String name = event.getPlayer().getName();
-            PlayerManager.getOnlinePlayer(name).loadPlayer();
+            new NoDropTime(event.getPlayer()).runTaskLater(PlayerSQL.getInstance(), 10);
+            PlayerManager.getOnlinePlayer(event.getPlayer()).loadPlayer();
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void playerDrop(PlayerDropItemEvent event) {
+            if (noDropSet.contains(event.getPlayer())) {
+                event.setCancelled(true);
+            }
+        }
+
+        private class NoDropTime extends BukkitRunnable {
+            private final Player player;
+
+            public NoDropTime(Player player) {
+                noDropSet.add(player);
+                this.player = player;
+            }
+
+            @Override
+            public void run() {
+                noDropSet.remove(player);
+            }
         }
     }
 

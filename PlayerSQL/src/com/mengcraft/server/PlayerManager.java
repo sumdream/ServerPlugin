@@ -13,12 +13,12 @@ public class PlayerManager {
         Player[] players = PlayerSQL.getInstance().getServer().getOnlinePlayers();
         if (players.length > 0) {
             try {
+                OnlinePlayer onlinePlayer = new OnlinePlayer();
                 String sql = "UPDATE PlayerSQL " +
                         "SET DATA = ?, ONLINE = 0 " +
                         "WHERE NAME = ?;";
                 PreparedStatement statement = PlayerSQL.getConnection().prepareStatement(sql);
                 for (Player player : players) {
-                    OnlinePlayer onlinePlayer = PlayerManager.getOnlinePlayer(player.getName());
                     String name = onlinePlayer.getPlayerName(player);
                     String data = onlinePlayer.getPlayerData(player);
                     statement.setString(1, data);
@@ -33,11 +33,11 @@ public class PlayerManager {
         }
     }
 
-    public static OnlinePlayer getOnlinePlayer(String name) {
-        OnlinePlayer onlinePlayer = playerMap.get(name);
+    public static OnlinePlayer getOnlinePlayer(Player player) {
+        OnlinePlayer onlinePlayer = playerMap.get(player.getName());
         if (onlinePlayer == null) {
-            onlinePlayer = new OnlinePlayer(name);
-            playerMap.put(name, onlinePlayer);
+            onlinePlayer = new OnlinePlayer(player);
+            playerMap.put(player.getName(), onlinePlayer);
         }
         return onlinePlayer;
     }
