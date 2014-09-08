@@ -1,5 +1,5 @@
 main: com.mengcraft.server.PlayerSQL
 name: PlayerSQL
-version: 1.4.5
+version: 1.4.6
 website: http://www.spigotmc.org/resources/playersql.552/
 depend: [ProtocolLib]

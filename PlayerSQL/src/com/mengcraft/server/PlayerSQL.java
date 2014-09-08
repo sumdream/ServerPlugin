@@ -21,9 +21,14 @@ public class PlayerSQL extends JavaPlugin {
 
     private static PlayerSQL plugin = null;
     private static Connection connection = null;
+    private static PlayerListener listener = null;
 
     public static Connection getConnection() {
         return connection;
+    }
+
+    public static PlayerListener getListener() {
+        return listener;
     }
 
     public static PlayerSQL getInstance() {
@@ -47,7 +52,8 @@ public class PlayerSQL extends JavaPlugin {
                         getConfig().getInt("plugin.check", 3000)
                         , getConfig().getInt("plugin.check", 3000)
                 );
-                getServer().getPluginManager().registerEvents(new PlayerListener(), this);
+                listener = new PlayerListener();
+                getServer().getPluginManager().registerEvents(listener, this);
 
                 String[] version = getServer().getBukkitVersion().split("-")[0].split("\\.");
                 boolean useUUID = Integer.parseInt(version[1]) > 7
@@ -110,43 +116,35 @@ public class PlayerSQL extends JavaPlugin {
         create.close();
     }
 
-    private class PlayerListener implements Listener {
-        private final ArrayList<Object> noDropSet;
+    public class PlayerListener implements Listener {
+        private final ArrayList<Object> playerSet;
 
         private PlayerListener() {
-            noDropSet = new ArrayList<>();
+            playerSet = new ArrayList<>();
         }
 
         @EventHandler(priority = EventPriority.MONITOR)
         public void playerQuit(PlayerQuitEvent event) {
-            PlayerManager.getOnlinePlayer(event.getPlayer()).savePlayer(true);
+            if (!playerSet.remove(event.getPlayer())) {
+                PlayerManager.getOnlinePlayer(event.getPlayer()).savePlayer(true);
+            }
         }
 
         @EventHandler(priority = EventPriority.LOWEST)
         public void playerJoin(PlayerJoinEvent event) {
-            new NoDropTime(event.getPlayer()).runTaskLater(PlayerSQL.getInstance(), 10);
+            playerSet.add(event.getPlayer());
             PlayerManager.getOnlinePlayer(event.getPlayer()).loadPlayer();
         }
 
         @EventHandler(priority = EventPriority.LOWEST)
         public void playerDrop(PlayerDropItemEvent event) {
-            if (noDropSet.contains(event.getPlayer())) {
+            if (playerSet.contains(event.getPlayer())) {
                 event.setCancelled(true);
             }
         }
 
-        private class NoDropTime extends BukkitRunnable {
-            private final Player player;
-
-            public NoDropTime(Player player) {
-                noDropSet.add(player);
-                this.player = player;
-            }
-
-            @Override
-            public void run() {
-                noDropSet.remove(player);
-            }
+        public void remove(Player player) {
+            playerSet.remove(player);
         }
     }
 

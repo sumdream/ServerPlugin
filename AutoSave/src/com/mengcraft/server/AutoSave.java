@@ -33,11 +33,7 @@ public class AutoSave extends JavaPlugin implements Listener {
         int delay = getConfig().getInt("delay.world", 1200);
         new SaveOffCommand().execute(getServer().getConsoleSender(), null, null);
         new WorldThread().runTaskTimer(this, delay, delay);
-        String[] strings = {
-                ChatColor.GREEN + "梦梦家高性能服务器出租",
-                ChatColor.GREEN + "淘宝店 http://shop105595113.taobao.com"
-        };
-        Bukkit.getConsoleSender().sendMessage(strings);
+        new SendAdvert().runTaskLater(this, 120);
         try {
             new Metrics(this).start();
             getLogger().info("http://mcstats.org/ connected!");
@@ -92,6 +88,17 @@ public class AutoSave extends JavaPlugin implements Listener {
         @Override
         public void run() {
             player.saveData();
+        }
+    }
+
+    private class SendAdvert extends BukkitRunnable {
+        @Override
+        public void run() {
+            String[] strings = {
+                    ChatColor.GREEN + "梦梦家高性能服务器出租",
+                    ChatColor.GREEN + "淘宝店 http://shop105595113.taobao.com"
+            };
+            Bukkit.getConsoleSender().sendMessage(strings);
         }
     }
 

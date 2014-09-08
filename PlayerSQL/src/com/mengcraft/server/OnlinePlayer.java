@@ -172,7 +172,9 @@ public class OnlinePlayer {
                 if (onlineResult.next()) {
                     if (onlineResult.getInt(1) < 1) {
                         new LoadPlayer(getPlayerData()).runTask(PlayerSQL.getInstance());
-                        lockPlayer();
+                        if (player.isOnline()) {
+                            lockPlayer();
+                        }
                     } else {
                         if (times < 5) {
                             times += 1;
@@ -180,17 +182,19 @@ public class OnlinePlayer {
                             run();
                         } else {
                             new LoadPlayer(getPlayerData()).runTask(PlayerSQL.getInstance());
-                            lockPlayer();
+                            if (player.isOnline()) {
+                                lockPlayer();
+                            }
                         }
                     }
                 } else {
-                    PlayerSQL.getInstance().getConfig().set("player." + playerName, "NewPlayer");
                     PreparedStatement insert = PlayerSQL.getConnection().prepareStatement(
                             "INSERT INTO PlayerSQL(NAME) VALUES(?);"
                     );
                     insert.setString(1, playerName);
                     insert.executeUpdate();
                     insert.close();
+                    PlayerSQL.getListener().remove(player);
                 }
                 onlineSelect.close();
                 onlineResult.close();
@@ -237,6 +241,7 @@ public class OnlinePlayer {
                 loadPlayerFood(player, array);
                 loadPlayerPotion(player, array);
                 loadPlayerChest(player, array);
+                PlayerSQL.getListener().remove(player);
             }
 
             private void loadPlayerPotion(Player player, JSONArray array) {
