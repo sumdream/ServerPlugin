@@ -34,7 +34,7 @@ public class AntiAnvil extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onClick(InventoryOpenEvent event) {
-        boolean isEvent = event.getView().getTopInventory().getType() == InventoryType.ANVIL
+        boolean isEvent = event.getView().getTopInventory().getType().equals(InventoryType.ANVIL)
                 && !event.getPlayer().hasPermission("anvil.use");
         if (isEvent) {
             getServer().getScheduler().runTaskLater(this, new CloseWindow(event.getPlayer()), 1);
