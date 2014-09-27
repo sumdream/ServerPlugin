@@ -9,6 +9,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -27,12 +28,11 @@ public class OnlinePlayer {
 
     private final String name;
     private final String playerName;
-    private int task;
+    private BukkitTask task;
 
     public OnlinePlayer(Player player) {
         this.name = player.getName();
         this.playerName = getPlayerName(player);
-        this.task = -1;
     }
 
     public OnlinePlayer() {
@@ -43,9 +43,7 @@ public class OnlinePlayer {
     public void loadPlayer() {
         Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
         new GetPlayer(player).start();
-        if (task < 0) {
-            task = new TimerPlayer().runTaskTimer(PlayerSQL.getInstance(), 3600, 3600).getTaskId();
-        }
+        task = new TimerPlayer().runTaskTimer(PlayerSQL.getInstance(), 6000, 6000);
     }
 
     public void savePlayer(boolean isLogout) {
@@ -55,14 +53,14 @@ public class OnlinePlayer {
                 , isLogout
         ).start();
         if (isLogout) {
-            PlayerSQL.getInstance().getServer().getScheduler().cancelTask(task);
+            task.cancel();
+            task = null;
         }
     }
 
     public String getPlayerName(Player player) {
         return PlayerSQL.getInstance().getConfig().getBoolean("useUUID", false)
-                ? player.getUniqueId().toString()
-                : player.getName();
+                ? player.getUniqueId().toString() : player.getName();
     }
 
     public String getPlayerData(Player player) {
@@ -83,7 +81,7 @@ public class OnlinePlayer {
     }
 
     private List<String> getStacks(ItemStack[] stacks) {
-        List<String> stackList = new ArrayList<>();
+        List<String> stackList = new ArrayList<String>();
         StreamSerializer serializer = StreamSerializer.getDefault();
         try {
             for (ItemStack stack : stacks) {
@@ -102,7 +100,7 @@ public class OnlinePlayer {
     }
 
     private List<Map> getPotion(Player player) {
-        List<Map> potions = new ArrayList<>();
+        List<Map> potions = new ArrayList<Map>();
         int size = player.getActivePotionEffects().size();
         if (size > 0) {
             PotionEffect[] active = player.getActivePotionEffects().toArray(new PotionEffect[size]);
@@ -234,14 +232,16 @@ public class OnlinePlayer {
 
             @Override
             public void run() {
-                JSONArray array = (JSONArray) JSONValue.parse(data);
-                loadPlayerInventory(player, array);
-                loadPlayerHealth(player, array);
-                loadPlayerLevel(player, array);
-                loadPlayerFood(player, array);
-                loadPlayerPotion(player, array);
-                loadPlayerChest(player, array);
-                PlayerSQL.getListener().remove(player);
+                if (data != null) {
+                    JSONArray array = (JSONArray) JSONValue.parse(data);
+                    loadPlayerInventory(player, array);
+                    loadPlayerHealth(player, array);
+                    loadPlayerLevel(player, array);
+                    loadPlayerFood(player, array);
+                    loadPlayerPotion(player, array);
+                    loadPlayerChest(player, array);
+                    PlayerSQL.getListener().remove(player);
+                }
             }
 
             private void loadPlayerPotion(Player player, JSONArray array) {
@@ -277,15 +277,15 @@ public class OnlinePlayer {
             private void loadPlayerFood(Player player, List array) {
                 boolean sync = PlayerSQL.getInstance().getConfig().getBoolean("sync.food", true);
                 if (sync) {
-                    long food = (long) array.get(1);
-                    player.setFoodLevel((int) food);
+                    int food = Integer.parseInt(array.get(1).toString());
+                    player.setFoodLevel(food);
                 }
             }
 
             private void loadPlayerHealth(Player player, List array) {
                 boolean sync = PlayerSQL.getInstance().getConfig().getBoolean("sync.health", true);
                 if (sync) {
-                    double health = (double) array.get(0);
+                    double health = Double.parseDouble(array.get(0).toString());
                     try {
                         player.setHealth(health);
                     } catch (Exception e) {
@@ -297,8 +297,8 @@ public class OnlinePlayer {
             private void loadPlayerLevel(Player player, List array) {
                 boolean sync = PlayerSQL.getInstance().getConfig().getBoolean("sync.exp", true);
                 if (sync) {
-                    long exp = (long) array.get(2);
-                    SetExpFix.setTotalExperience(player, (int) exp);
+                    int exp = Integer.parseInt(array.get(2).toString());
+                    SetExpFix.setTotalExperience(player, exp);
                 }
             }
 
@@ -325,7 +325,7 @@ public class OnlinePlayer {
 
             private ItemStack[] getStacks(List array) {
                 StreamSerializer serializer = StreamSerializer.getDefault();
-                List<ItemStack> stacks = new ArrayList<>();
+                List<ItemStack> stacks = new ArrayList<ItemStack>();
                 try {
                     for (Object o : array) {
                         if (o != null) {

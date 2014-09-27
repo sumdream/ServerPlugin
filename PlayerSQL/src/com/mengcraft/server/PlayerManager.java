@@ -7,7 +7,7 @@ import java.util.HashMap;
 
 public class PlayerManager {
 
-    private static HashMap<String, OnlinePlayer> playerMap = new HashMap<>();
+    private static HashMap<String, OnlinePlayer> playerMap = new HashMap<String, OnlinePlayer>();
 
     public static void saveAll() {
         Player[] players = PlayerSQL.getInstance().getServer().getOnlinePlayers();

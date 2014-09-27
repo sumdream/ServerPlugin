@@ -117,10 +117,10 @@ public class PlayerSQL extends JavaPlugin {
     }
 
     public class PlayerListener implements Listener {
-        private final ArrayList<Object> playerSet;
+        private final ArrayList<Player> playerSet;
 
         private PlayerListener() {
-            playerSet = new ArrayList<>();
+            playerSet = new ArrayList<Player>();
         }
 
         @EventHandler(priority = EventPriority.MONITOR)
