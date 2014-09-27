@@ -1,0 +1,9 @@
+main: com.mengcraft.server.AntiAnvil
+name: AntiAnvil
+version: 0.1.0
+website: http://www.mengcraft.com/
+
+permissions:
+  anvil.use:
+    description: Basic plugin permission.
+    default: op
