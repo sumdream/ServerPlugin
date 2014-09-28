@@ -9,7 +9,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -17,7 +16,10 @@ import org.json.simple.JSONValue;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by zmy on 14-7-26.
@@ -28,7 +30,6 @@ public class OnlinePlayer {
 
     private final String name;
     private final String playerName;
-    private BukkitTask task;
 
     public OnlinePlayer(Player player) {
         this.name = player.getName();
@@ -43,7 +44,6 @@ public class OnlinePlayer {
     public void loadPlayer() {
         Player player = PlayerSQL.getInstance().getServer().getPlayerExact(name);
         new GetPlayer(player).start();
-        task = new TimerPlayer().runTaskTimer(PlayerSQL.getInstance(), 6000, 6000);
     }
 
     public void savePlayer(boolean isLogout) {
@@ -52,10 +52,6 @@ public class OnlinePlayer {
                 getPlayerData(player)
                 , isLogout
         ).start();
-        if (isLogout) {
-            task.cancel();
-            task = null;
-        }
     }
 
     public String getPlayerName(Player player) {
@@ -110,13 +106,6 @@ public class OnlinePlayer {
             }
         }
         return potions;
-    }
-
-    private class TimerPlayer extends BukkitRunnable {
-        @Override
-        public void run() {
-            savePlayer(false);
-        }
     }
 
     private class SavePlayer extends Thread {
