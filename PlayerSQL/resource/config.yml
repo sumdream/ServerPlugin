@@ -1,14 +1,12 @@
 plugin:
-  use: false
   database: jdbc:mysql://127.0.0.1:3306/database
   username: username
   password: password
-  check: 3000
 
 sync:
   health: true
   food: true
   exp: true
   inventory: true
-  enderChest: true
+  chest: true
   potion: true
