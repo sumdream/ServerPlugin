@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -29,35 +30,31 @@ import java.util.*;
  */
 public class PlayerSQL extends JavaPlugin {
 
+    private Plugin plugin;
     private Connection connection;
     private boolean uuid;
 
     @Override
     public void onLoad() {
         saveDefaultConfig();
+        this.plugin = this;
     }
 
     @Override
     public void onEnable() {
-        try {
-            setConnection();
-            setDataTable();
-            getServer().getScheduler().runTaskTimer(this, new CheckTask(), 3600, 3600);
-            getServer().getPluginManager().registerEvents(new PlayerListener(), this);
+        setDatabase();
+        setDataTable();
+        getServer().getPluginManager().registerEvents(new PlayerListener(), this);
 
-            String[] version = getServer().getBukkitVersion().split("-")[0].split("\\.");
-            this.uuid = Integer.parseInt(version[1]) > 7
-                    || (Integer.parseInt(version[1]) > 6
-                    && Integer.parseInt(version[2]) > 5);
-            getLogger().info("Author: min梦梦");
-            getLogger().info("插件作者: min梦梦");
-        } catch (Exception e) {
-            getLogger().warning("Failed to connect to database server!");
-            setEnabled(false);
-        }
+        String[] version = getServer().getBukkitVersion().split("-")[0].split("\\.");
+        this.uuid = Integer.parseInt(version[1]) > 7
+                || (Integer.parseInt(version[1]) > 6
+                && Integer.parseInt(version[2]) > 5);
+        getLogger().info("Author: min梦梦");
+        getLogger().info("插件作者: min梦梦");
         try {
             new Metrics(this).start();
-        } catch (Exception e) {
+        } catch (IOException e) {
             getLogger().warning("Failed to connect to Metrics server!");
         }
     }
@@ -65,46 +62,48 @@ public class PlayerSQL extends JavaPlugin {
     @Override
     public void onDisable() {
         for (Player player : getServer().getOnlinePlayers()) {
-            new Thread(new SavePlayerTask(player)).start();
+            new Thread(new SavePlayerTask(player, true)).start();
         }
         getLogger().info("Author: min梦梦");
         getLogger().info("插件作者: min梦梦");
     }
 
-    private void setConnection() {
-        String database = getConfig().getString("plugin.database");
-        String username = getConfig().getString("plugin.username");
-        String password = getConfig().getString("plugin.password");
+    private void setDatabase() {
         try {
+            String database = getConfig().getString("plugin.database");
+            String username = getConfig().getString("plugin.username");
+            String password = getConfig().getString("plugin.password");
             this.connection = DriverManager.getConnection(database, username, password);
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (SQLException e) {
+            getLogger().warning("Can not link to database server!");
         }
+
     }
 
-    private void setDataTable() throws Exception {
-        Statement create = this.connection.createStatement();
-        create.execute("CREATE TABLE IF NOT EXISTS PlayerSQL("
-                        + "ID int NOT NULL AUTO_INCREMENT, "
-                        + "NAME text NOT NULL, "
-                        + "DATA text NULL, "
-                        + "ONLINE int NULL, "
-                        + "PRIMARY KEY(ID)" +
-                        ");"
-        );
+    private void setDataTable() {
         try {
-            create.execute("ALTER TABLE `PlayerSQL` ADD COLUMN `ONLINE` int NULL AFTER `DATA`;");
-        } catch (Exception e) {
-            e.getMessage();
+            Statement create = this.connection.createStatement();
+            create.execute("CREATE TABLE IF NOT EXISTS PlayerSQL("
+                            + "ID int NOT NULL AUTO_INCREMENT, "
+                            + "NAME text NOT NULL, "
+                            + "DATA text NULL, "
+                            + "ONLINE int NULL, "
+                            + "PRIMARY KEY(ID)" +
+                            ");"
+            );
+            create.close();
+        } catch (SQLException e) {
+            getLogger().warning("Can not create table!");
         }
-        create.close();
     }
 
     private class PlayerListener implements Listener {
         private final HashSet<String> protectNameSet;
+        private final HashMap<String, Integer> onlineMap;
 
         public PlayerListener() {
             protectNameSet = new HashSet<String>();
+            onlineMap = new HashMap<String, Integer>();
         }
 
         /**
@@ -117,20 +116,35 @@ public class PlayerSQL extends JavaPlugin {
             if (this.protectNameSet.contains(event.getPlayer().getName())) {
                 this.protectNameSet.remove(event.getPlayer().getName());
             } else {
-                new Thread(new SavePlayerTask(event.getPlayer())).start();
+                new Thread(new SavePlayerTask(event.getPlayer(), true)).start();
             }
+            getServer().getScheduler().cancelTask(onlineMap.remove(event.getPlayer().getName()));
         }
 
         @EventHandler(priority = EventPriority.LOWEST)
         public void playerJoinEvent(PlayerJoinEvent event) {
+            protectNameSet.add(event.getPlayer().getName());
             new Thread(new LoadPlayerTask(event.getPlayer())).start();
-
+            onlineMap.put(event.getPlayer().getName(), getServer().getScheduler().runTaskTimer(plugin, new SavePlayerTimer(event.getPlayer()), 6000, 6000).getTaskId());
         }
 
         @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
         public void playerDropItemEvent(PlayerDropItemEvent event) {
             if (this.protectNameSet.contains(event.getPlayer().getName())) {
                 event.setCancelled(true);
+            }
+        }
+
+        private class SavePlayerTimer implements Runnable {
+            private final String name;
+
+            public SavePlayerTimer(Player player) {
+                this.name = player.getName();
+            }
+
+            @Override
+            public void run() {
+                new Thread(new SavePlayerTask(getServer().getPlayerExact(this.name), false)).start();
             }
         }
 
@@ -143,7 +157,6 @@ public class PlayerSQL extends JavaPlugin {
                 this.name = player.getName();
                 this.uid = player.getUniqueId().toString();
                 this.check = 0;
-                protectNameSet.add(this.name);
             }
 
             /**
@@ -167,7 +180,7 @@ public class PlayerSQL extends JavaPlugin {
                             } else {
                                 loadPlayer(result.getString(3));
                                 protectNameSet.remove(this.name);
-                                getLogger().warning("Player [" + name + "] 's lock status error!");
+                                getLogger().warning("Player " + name + " 's lock status error!");
                             }
                         }
                     } else {
@@ -177,7 +190,8 @@ public class PlayerSQL extends JavaPlugin {
                     result.close();
                     select.close();
                 } catch (SQLException e) {
-                    e.printStackTrace();
+                    setDatabase();
+                    run();
                 }
             }
 
@@ -214,7 +228,7 @@ public class PlayerSQL extends JavaPlugin {
                     if (getConfig().getBoolean("sync.health", true)) {
                         try {
                             player.setHealth(array.get(0).getAsDouble());
-                        } catch (Exception e) {
+                        } catch (IllegalArgumentException e) {
                             player.setHealth(20);
                         }
                     }
@@ -228,6 +242,7 @@ public class PlayerSQL extends JavaPlugin {
                     if (getConfig().getBoolean("sync.chest", true)) {
                         player.getEnderChest().setContents(arrayToStacks(array.get(5).getAsJsonArray()));
                     }
+                    getLogger().info("Load player " + name + " done!");
                 }
             }
 
@@ -263,7 +278,7 @@ public class PlayerSQL extends JavaPlugin {
                             stackList.add(serializer.deserializeItemStack(element.getAsString()));
                         }
                     }
-                } catch (Exception e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 return stackList.toArray(new ItemStack[array.size()]);
@@ -274,6 +289,7 @@ public class PlayerSQL extends JavaPlugin {
                 insert.setString(1, newName);
                 insert.executeUpdate();
                 insert.close();
+                getLogger().info("Player " + name + " join!");
             }
         }
 
@@ -282,11 +298,13 @@ public class PlayerSQL extends JavaPlugin {
     private class SavePlayerTask implements Runnable {
         private final String name;
         private final String data;
+        private final boolean quit;
 
 
-        public SavePlayerTask(Player player) {
+        public SavePlayerTask(Player player, boolean quit) {
             this.name = uuid ? player.getUniqueId().toString() : player.getName();
             this.data = getPlayerData(player);
+            this.quit = quit;
         }
 
         /**
@@ -343,31 +361,17 @@ public class PlayerSQL extends JavaPlugin {
         @Override
         public void run() {
             try {
-                PreparedStatement save = connection.prepareStatement("UPDATE `PlayerSQL` SET `DATA` = ?, `ONLINE` = 0 WHERE `NAME` = ?;");
+                PreparedStatement save = connection.prepareStatement("UPDATE `PlayerSQL` SET `DATA` = ?, `ONLINE` = ? WHERE `NAME` = ?;");
                 save.setString(1, this.data);
-                save.setString(2, this.name);
+                save.setString(3, this.name);
+                save.setInt(2, this.quit ? 0 : 1);
                 save.executeUpdate();
                 save.close();
             } catch (SQLException e) {
-                e.printStackTrace();
+                setDatabase();
+                run();
             }
-        }
-    }
-
-    private class CheckTask implements Runnable {
-        @Override
-        public void run() {
-            if (connection != null) {
-                boolean isClosed = false;
-                try {
-                    isClosed = connection.isClosed();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-                if (isClosed) {
-                    setConnection();
-                }
-            }
+            getLogger().info("Save player " + name + " done!");
         }
     }
 }
