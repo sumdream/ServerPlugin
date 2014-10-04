@@ -1,13 +1,12 @@
 package com.mengcraft.server;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.mcstats.Metrics;
 
@@ -26,30 +25,70 @@ public class BanWorld extends JavaPlugin {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(new Listener(), this);
         try {
-            Metrics metrics = new Metrics(this);
-            metrics.start();
+            new Metrics(this).start();
         } catch (IOException e) {
-            e.printStackTrace();
+            getLogger().warning("Can not link to Metrics server!");
         }
         String[] strings = {
                 ChatColor.GREEN + "梦梦家高性能服务器出租",
                 ChatColor.GREEN + "淘宝店 http://shop105595113.taobao.com"
         };
-        Bukkit.getConsoleSender().sendMessage(strings);
+        getServer().getConsoleSender().sendMessage(strings);
     }
 
-    public class Listener implements org.bukkit.event.Listener {
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (sender.hasPermission("bw.admin") && sender instanceof Player) {
+            if (args.length < 1) {
+                sendInfo(sender);
+            } else if (args.length < 2) {
+                if (args[0].equals("add")) {
+                    Player player = getServer().getPlayerExact(sender.getName());
+                    List<String> bannedList = getConfig().getStringList("banned");
+                    if (bannedList.contains(player.getWorld().getName())) {
+                        sender.sendMessage(ChatColor.RED + "当前世界已经位于黑名单内");
+                    } else {
+                        bannedList.add(player.getWorld().getName());
+                        saveConfig();
+                        sender.sendMessage(ChatColor.RED + "把当前世界添加到黑名单成功");
+                    }
+                } else if (args[0].equals("remove")) {
+                    Player player = getServer().getPlayerExact(sender.getName());
+                    List<String> bannedList = getConfig().getStringList("banned");
+                    if (bannedList.contains(player.getWorld().getName())) {
+                        bannedList.remove(player.getWorld().getName());
+                        saveConfig();
+                        sender.sendMessage(ChatColor.RED + "把当前世界从黑名单删除成功");
+                    } else {
+                        sender.sendMessage(ChatColor.RED + "当前世界不位于黑名单内");
+                    }
+                } else {
+                    sendInfo(sender);
+                }
+            } else {
+                sendInfo(sender);
+            }
+        }
+        return true;
+    }
+
+    private void sendInfo(CommandSender sender) {
+        String[] strings = {
+                ChatColor.RED + "/bw add               把当前世界添加到黑名单"
+                , ChatColor.RED + "/bw remove            把当前世界从黑名单删除"
+        };
+        sender.sendMessage(strings);
+    }
+
+    private class Listener implements org.bukkit.event.Listener {
         @EventHandler
         public void playerTeleport(PlayerTeleportEvent event) {
-            List<String> whiteList = getConfig().getStringList("white-list");
             String worldName = event.getTo().getWorld().getName();
-            boolean status = whiteList.contains(worldName);
-            if (!status) {
-                Player player = event.getPlayer();
-                status = player.hasPermission("world." + worldName);
-                if (!status) {
+            if (getConfig().getStringList("banned").contains(worldName)) {
+                boolean permission = event.getPlayer().hasPermission("bw.admin") || event.getPlayer().hasPermission("bw." + worldName);
+                if (!permission) {
                     String message = ChatColor.RED + "你没有前往 " + worldName + " 世界的权限";
-                    player.sendMessage(message);
+                    event.getPlayer().sendMessage(message);
                     event.setCancelled(true);
                 }
             }
@@ -57,15 +96,12 @@ public class BanWorld extends JavaPlugin {
 
         @EventHandler
         public void playerPortal(PlayerPortalEvent event) {
-            List<String> whiteList = getConfig().getStringList("white-list");
             String worldName = event.getTo().getWorld().getName();
-            boolean status = whiteList.contains(worldName);
-            if (!status) {
-                Player player = event.getPlayer();
-                status = player.hasPermission("world." + worldName);
-                if (!status) {
+            if (getConfig().getStringList("banned").contains(worldName)) {
+                boolean permission = event.getPlayer().hasPermission("bw.admin") || event.getPlayer().hasPermission("bw." + worldName);
+                if (!permission) {
                     String message = ChatColor.RED + "你没有前往 " + worldName + " 世界的权限";
-                    player.sendMessage(message);
+                    event.getPlayer().sendMessage(message);
                     event.setCancelled(true);
                 }
             }

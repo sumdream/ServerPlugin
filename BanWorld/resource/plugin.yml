@@ -1,3 +1,13 @@
 name: BanWorld
 main: com.mengcraft.server.BanWorld
-version: 0.2.2
+version: 0.3.0
+
+commands:
+  bw:
+    description: Basic command of this plugin.
+    permission: worlds.admin
+
+permissions:
+  bw.admin:
+    description: Basic permission of this plugin.
+    default: true

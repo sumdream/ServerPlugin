@@ -26,9 +26,11 @@ public class AntiCraft extends JavaPlugin implements Listener {
     @EventHandler
     public void onInventoryClickEvent(InventoryClickEvent event) {
         ItemStack stack = event.getCurrentItem();
-        List<Short> typeList = getConfig().getShortList("item." + stack.getType());
-        if (typeList.contains(stack.getDurability())) {
-            event.setCurrentItem(new ItemStack(Material.AIR));
+        if (stack != null) {
+            List<Short> typeList = getConfig().getShortList("item." + stack.getType());
+            if (typeList.contains(stack.getDurability())) {
+                event.setCurrentItem(new ItemStack(Material.AIR));
+            }
         }
     }
 
