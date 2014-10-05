@@ -10,7 +10,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.mcstats.Metrics;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -21,6 +23,16 @@ public class AntiCraft extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
+        String[] strings = {
+                ChatColor.GREEN + "梦梦家高性能服务器出租",
+                ChatColor.GREEN + "淘宝店 http://shop105595113.taobao.com"
+        };
+        getServer().getConsoleSender().sendMessage(strings);
+        try {
+            new Metrics(this).start();
+        } catch (IOException e) {
+            getLogger().warning("Can not link to Metrics server!");
+        }
     }
 
     @EventHandler
@@ -54,7 +66,21 @@ public class AntiCraft extends JavaPlugin implements Listener {
                         saveConfig();
                     }
                 } else if (args[0].equals("remove")) {
-                    sender.sendMessage(ChatColor.RED + "手动去配置文件改吧");
+                    String name = player.getItemInHand().getType().toString();
+                    List<Short> typeList = getConfig().getShortList("item." + name);
+                    short type = player.getItemInHand().getDurability();
+                    if (typeList.contains(type)) {
+                        typeList.remove(type);
+                        sender.sendMessage(ChatColor.RED + "从列表移除物品 " + player.getItemInHand().getType() + " 成功");
+                        if (typeList.isEmpty()) {
+                            getConfig().set("item." + name, null);
+                        } else {
+                            getConfig().set("item." + name, typeList);
+                        }
+                        saveConfig();
+                    } else {
+                        sender.sendMessage(ChatColor.RED + "列表内没有此物品");
+                    }
                 } else {
                     sendInfo(sender);
                 }
