@@ -165,7 +165,7 @@ public class PlayerSQL extends JavaPlugin {
             @Override
             public void run() {
                 try {
-                    PreparedStatement select = connection.prepareStatement("SELECT * FROM `PlayerSQL` WHERE `NAME` = ?;");
+                    PreparedStatement select = connection.prepareStatement("SELECT * FROM `PlayerSQL` WHERE `NAME` = ? FOR UPDATE;");
                     select.setString(1, uuid ? this.uid : this.name);
                     ResultSet result = select.executeQuery();
                     if (result.next()) {
@@ -174,7 +174,7 @@ public class PlayerSQL extends JavaPlugin {
                             lockPlayer(result.getString(2));
                             protectNameSet.remove(this.name);
                         } else {
-                            if (check < 4) {
+                            if (check < 10) {
                                 check = check + 1;
                                 run();
                             } else {
