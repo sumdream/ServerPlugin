@@ -165,6 +165,7 @@ public class PlayerSQL extends JavaPlugin {
             @Override
             public void run() {
                 try {
+                    Thread.sleep(100);
                     PreparedStatement select = connection.prepareStatement("SELECT * FROM `PlayerSQL` WHERE `NAME` = ? FOR UPDATE;");
                     select.setString(1, uuid ? this.uid : this.name);
                     ResultSet result = select.executeQuery();
@@ -192,6 +193,8 @@ public class PlayerSQL extends JavaPlugin {
                 } catch (SQLException e) {
                     setDatabase();
                     run();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
 
