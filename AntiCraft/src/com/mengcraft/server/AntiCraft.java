@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.mcstats.Metrics;
@@ -36,7 +37,16 @@ public class AntiCraft extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onInventoryClickEvent(InventoryClickEvent event) {
+    public void onPlayerPickupItem(PlayerPickupItemEvent event) {
+        ItemStack stack = event.getItem().getItemStack();
+        List<Short> typeList = getConfig().getShortList("item." + stack.getType());
+        if (typeList.contains(stack.getDurability())) {
+            event.getItem().setItemStack(new ItemStack(Material.AIR));
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
         ItemStack stack = event.getCurrentItem();
         if (stack != null) {
             List<Short> typeList = getConfig().getShortList("item." + stack.getType());
