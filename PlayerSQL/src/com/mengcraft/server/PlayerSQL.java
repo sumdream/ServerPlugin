@@ -76,6 +76,7 @@ public class PlayerSQL extends JavaPlugin {
             this.connection = DriverManager.getConnection(database, username, password);
         } catch (SQLException e) {
             getLogger().warning("Can not link to database server!");
+            getServer().getPluginManager().disablePlugin(this);
         }
 
     }
@@ -111,8 +112,8 @@ public class PlayerSQL extends JavaPlugin {
          *
          * @param event PlayerQuitEvent.
          */
-        @EventHandler(priority = EventPriority.LOWEST)
-        public void playerQuitEvent(PlayerQuitEvent event) {
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onPlayerQuit(PlayerQuitEvent event) {
             if (this.protectNameSet.contains(event.getPlayer().getName())) {
                 this.protectNameSet.remove(event.getPlayer().getName());
             } else {
@@ -124,8 +125,8 @@ public class PlayerSQL extends JavaPlugin {
         @EventHandler(priority = EventPriority.LOWEST)
         public void playerJoinEvent(PlayerJoinEvent event) {
             protectNameSet.add(event.getPlayer().getName());
-            new Thread(new LoadPlayerTask(event.getPlayer())).start();
             onlineMap.put(event.getPlayer().getName(), getServer().getScheduler().runTaskTimer(plugin, new SavePlayerTimer(event.getPlayer()), 6000, 6000).getTaskId());
+            new Thread(new LoadPlayerTask(event.getPlayer())).start();
         }
 
         @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -165,7 +166,6 @@ public class PlayerSQL extends JavaPlugin {
             @Override
             public void run() {
                 try {
-                    Thread.sleep(100);
                     PreparedStatement select = connection.prepareStatement("SELECT * FROM `PlayerSQL` WHERE `NAME` = ? FOR UPDATE;");
                     select.setString(1, uuid ? this.uid : this.name);
                     ResultSet result = select.executeQuery();
@@ -177,6 +177,7 @@ public class PlayerSQL extends JavaPlugin {
                         } else {
                             if (check < 10) {
                                 check = check + 1;
+                                Thread.sleep(100);
                                 run();
                             } else {
                                 loadPlayer(result.getString(3));
